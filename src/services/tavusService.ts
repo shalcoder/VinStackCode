@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 
 // Tavus API configuration
 const TAVUS_API_URL = 'https://api.tavus.io/v1';
-const TAVUS_API_KEY = process.env.VITE_TAVUS_API_KEY || 'demo_key_for_hackathon';
+const TAVUS_API_KEY = import.meta.env.VITE_TAVUS_API_KEY || 'b20f93fa0d7f41c4a8030b9139e9fa92';
 
 interface TavusVideoRequest {
   script: string;
@@ -29,6 +29,7 @@ export const tavusService = {
     try {
       // In production, this would be a real API call to Tavus
       // For the hackathon, we'll mock the response
+      console.log(`Using Tavus API key: ${TAVUS_API_KEY}`);
       
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1500));

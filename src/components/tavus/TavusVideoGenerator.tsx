@@ -37,6 +37,30 @@ const TavusVideoGenerator: React.FC<TavusVideoGeneratorProps> = ({
   const [videoRequest, setVideoRequest] = useState<VideoGenerationRequest | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState('b20f93fa0d7f41c4a8030b9139e9fa92');
+
+  useEffect(() => {
+    // Check if snippet already has a video
+    const checkExistingVideo = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('snippets')
+          .select('custom_fields')
+          .eq('id', snippetId)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data?.custom_fields?.video_url) {
+          setGeneratedVideoUrl(data.custom_fields.video_url);
+        }
+      } catch (err) {
+        console.error('Error checking for existing video:', err);
+      }
+    };
+    
+    checkExistingVideo();
+  }, [snippetId]);
 
   const generateDefaultScript = () => {
     return `Hello! Let me explain this ${snippetLanguage} code snippet titled "${snippetTitle}".
@@ -72,6 +96,9 @@ Feel free to fork this snippet and experiment with the code yourself!`;
       setVideoRequest(newRequest);
       setIsModalOpen(false);
 
+      // In a real implementation, this would call the Tavus API with the apiKey
+      console.log(`Using Tavus API key: ${apiKey}`);
+      
       // Mock Tavus API call - in production, this would call the actual Tavus API
       const videoUrl = await mockTavusVideoGeneration(script, snippetLanguage, requestId);
       
@@ -96,6 +123,20 @@ Feel free to fork this snippet and experiment with the code yourself!`;
           }
         })
         .eq('id', snippetId);
+
+      // Track video generation analytics
+      await supabase
+        .from('snippet_analytics')
+        .insert({
+          snippet_id: snippetId,
+          event_type: 'video_generation',
+          user_id: user.id,
+          metadata: {
+            video_url: videoUrl,
+            generated_at: new Date().toISOString(),
+            language: snippetLanguage
+          }
+        });
 
       onVideoGenerated?.(videoUrl);
 

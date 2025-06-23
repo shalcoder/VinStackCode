@@ -81,6 +81,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [onTimeUpdate]);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
