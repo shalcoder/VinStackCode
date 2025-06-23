@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Edit, Heart, Copy, Share, Eye, MessageCircle, Calendar, User } from 'lucide-react';
+import { ArrowLeft, Edit, Heart, Copy, Share, Eye, MessageCircle, Calendar, User, GitBranch, Video } from 'lucide-react';
 import { useAuth } from '../store/authStore';
 import { useSnippets } from '../store/snippetStore';
 import { useComments } from '../hooks/useComments';
@@ -9,6 +9,9 @@ import { formatRelativeTime, copyToClipboard } from '../utils';
 import CodeEditor from '../components/editor/CodeEditor';
 import Button from '../components/ui/Button';
 import Toast from '../components/ui/Toast';
+import TavusVideoComments from '../components/tavus/TavusVideoComments';
+import SocialShare from '../components/social/SocialShare';
+import FollowSystem from '../components/social/FollowSystem';
 
 const SnippetViewPage: React.FC = () => {
   const { id } = useParams();
@@ -17,7 +20,7 @@ const SnippetViewPage: React.FC = () => {
   const { snippets, likeSnippet, incrementViews } = useSnippets();
   const { comments, addComment } = useComments(id || '');
   
-  const [snippet, setSnippet] = useState(null);
+  const [snippet, setSnippet] = useState<any>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [toast, setToast] = useState({
@@ -65,24 +68,6 @@ const SnippetViewPage: React.FC = () => {
     }
   };
 
-  const handleShare = async () => {
-    if (!snippet) return;
-    
-    try {
-      await navigator.share({
-        title: snippet.title,
-        text: snippet.description,
-        url: window.location.href,
-      });
-    } catch (error) {
-      // Fallback to copying URL
-      const success = await copyToClipboard(window.location.href);
-      if (success) {
-        showToast('Link copied to clipboard!', 'success');
-      }
-    }
-  };
-
   const handleAddComment = async () => {
     if (!user || !id || !newComment.trim()) return;
     
@@ -117,6 +102,7 @@ const SnippetViewPage: React.FC = () => {
   const likesCount = snippet.snippet_likes?.[0]?.count || 0;
   const viewsCount = snippet.snippet_views?.[0]?.count || 0;
   const commentsCount = comments.length;
+  const forksCount = snippet.snippet_forks?.[0]?.count || 0;
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -141,7 +127,7 @@ const SnippetViewPage: React.FC = () => {
               onClick={handleLike}
               className={isLiked ? 'text-red-400' : ''}
             >
-              <Heart className={`w-4 h-4 mr-2 ${isLiked ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 mr-2 ${isLiked ? 'fill-current text-red-500' : ''}`} />
               {likesCount}
             </Button>
             
@@ -154,14 +140,13 @@ const SnippetViewPage: React.FC = () => {
               Copy
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleShare}
-            >
-              <Share className="w-4 h-4 mr-2" />
-              Share
-            </Button>
+            <SocialShare snippet={{
+              id: snippet.id,
+              title: snippet.title,
+              description: snippet.description,
+              language: snippet.language,
+              author: snippet.profiles?.username || 'Unknown'
+            }} />
 
             {canEdit && (
               <Button
@@ -212,7 +197,7 @@ const SnippetViewPage: React.FC = () => {
               {/* Tags */}
               {snippet.tags && snippet.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {snippet.tags.map((tag) => (
+                  {snippet.tags.map((tag: string) => (
                     <span
                       key={tag}
                       className="px-2 py-1 bg-gray-700 text-gray-300 text-sm rounded-full"
@@ -237,6 +222,12 @@ const SnippetViewPage: React.FC = () => {
                   <MessageCircle className="w-4 h-4" />
                   <span>{commentsCount} comments</span>
                 </div>
+                {forksCount > 0 && (
+                  <div className="flex items-center space-x-1">
+                    <GitBranch className="w-4 h-4" />
+                    <span>{forksCount} forks</span>
+                  </div>
+                )}
                 <div className="flex items-center space-x-1">
                   <Calendar className="w-4 h-4" />
                   <span>{formatRelativeTime(new Date(snippet.created_at))}</span>
@@ -259,20 +250,35 @@ const SnippetViewPage: React.FC = () => {
               />
             </motion.div>
 
-            {/* Comments Section */}
+            {/* Tavus Video Comments Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
+            >
+              <TavusVideoComments
+                snippetId={snippet.id}
+                snippetTitle={snippet.title}
+                snippetCode={snippet.content}
+                snippetLanguage={snippet.language}
+                comments={comments}
+                onAddComment={addComment}
+              />
+            </motion.div>
+
+            {/* Add Comment */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
               className="bg-gray-900 rounded-lg p-6"
             >
               <h3 className="text-lg font-semibold text-white mb-4">
-                Comments ({commentsCount})
+                Add Comment
               </h3>
 
-              {/* Add Comment */}
-              {user && (
-                <div className="mb-6">
+              {user ? (
+                <div>
                   <textarea
                     placeholder="Add a comment..."
                     value={newComment}
@@ -291,43 +297,11 @@ const SnippetViewPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+              ) : (
+                <div className="text-center py-4 text-gray-400">
+                  <p>Please sign in to add comments</p>
+                </div>
               )}
-
-              {/* Comments List */}
-              <div className="space-y-4">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="p-4 bg-gray-800 rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">
-                          {comment.profiles.username.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-medium text-white">
-                            {comment.profiles.username}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {formatRelativeTime(new Date(comment.created_at))}
-                          </span>
-                        </div>
-                        <p className="text-gray-300 whitespace-pre-wrap">
-                          {comment.content}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {comments.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No comments yet</p>
-                    <p className="text-sm">Be the first to comment on this snippet</p>
-                  </div>
-                )}
-              </div>
             </motion.div>
           </div>
 
@@ -340,7 +314,7 @@ const SnippetViewPage: React.FC = () => {
               className="bg-gray-900 rounded-lg p-6"
             >
               <h3 className="text-lg font-semibold text-white mb-4">Author</h3>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 mb-4">
                 <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
                   <User className="w-6 h-6 text-white" />
                 </div>
@@ -353,6 +327,14 @@ const SnippetViewPage: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Follow System */}
+              {user && user.id !== snippet.owner_id && (
+                <FollowSystem
+                  targetUserId={snippet.owner_id}
+                  targetUsername={snippet.profiles?.username || 'Unknown'}
+                />
+              )}
             </motion.div>
 
             {/* Snippet Info */}
@@ -384,7 +366,37 @@ const SnippetViewPage: React.FC = () => {
                   <span className="text-gray-400">Visibility:</span>
                   <span className="text-white capitalize">{snippet.visibility}</span>
                 </div>
+                {forksCount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Forks:</span>
+                    <span className="text-white">{forksCount}</span>
+                  </div>
+                )}
               </div>
+            </motion.div>
+
+            {/* Video Tutorial Generator */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-gray-900 rounded-lg p-6"
+            >
+              <div className="flex items-center space-x-2 mb-4">
+                <Video className="w-5 h-5 text-primary-500" />
+                <h3 className="text-lg font-semibold text-white">Video Tutorial</h3>
+              </div>
+              
+              <p className="text-gray-400 mb-4">
+                Generate an AI-powered video explanation of this code snippet using Tavus AI.
+              </p>
+              
+              <TavusVideoGenerator
+                snippetId={snippet.id}
+                snippetTitle={snippet.title}
+                snippetCode={snippet.content}
+                snippetLanguage={snippet.language}
+              />
             </motion.div>
           </div>
         </div>
