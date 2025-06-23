@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables
@@ -12,6 +13,33 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+async function executeSql(sql) {
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'apikey': supabaseServiceKey
+      },
+      body: JSON.stringify({ sql_query: sql })
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('⚠️  exec_sql function not found. Please run migrations first.');
+        return false;
+      }
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.warn(`⚠️  Warning executing SQL: ${error.message}`);
+    return false;
+  }
+}
 
 async function resetDatabase() {
   try {
@@ -35,29 +63,47 @@ async function resetDatabase() {
       'profiles'
     ];
 
+    // Also drop any functions we might have created
+    const functions = [
+      'update_snippet_search_vector()',
+      'update_updated_at_column()',
+      'handle_new_user()'
+    ];
+
+    // Drop tables
     for (const table of tables) {
       console.log(`🗑️  Dropping table: ${table}`);
       
-      try {
-        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'apikey': supabaseServiceKey
-          },
-          body: JSON.stringify({ 
-            sql_query: `DROP TABLE IF EXISTS ${table} CASCADE;` 
-          })
-        });
+      const success = await executeSql(`DROP TABLE IF EXISTS ${table} CASCADE;`);
+      if (success) {
+        console.log(`✅ Dropped table: ${table}`);
+      } else {
+        console.warn(`⚠️  Could not drop table: ${table}`);
+      }
+    }
 
-        if (response.ok) {
-          console.log(`✅ Dropped table: ${table}`);
-        } else {
-          console.warn(`⚠️  Could not drop table: ${table}`);
-        }
-      } catch (error) {
-        console.warn(`⚠️  Could not drop table: ${table} - ${error.message}`);
+    // Drop functions
+    for (const func of functions) {
+      console.log(`🗑️  Dropping function: ${func}`);
+      
+      const success = await executeSql(`DROP FUNCTION IF EXISTS ${func} CASCADE;`);
+      if (success) {
+        console.log(`✅ Dropped function: ${func}`);
+      } else {
+        console.warn(`⚠️  Could not drop function: ${func}`);
+      }
+    }
+
+    // Drop any custom types
+    const types = ['user_role', 'snippet_visibility', 'notification_type'];
+    for (const type of types) {
+      console.log(`🗑️  Dropping type: ${type}`);
+      
+      const success = await executeSql(`DROP TYPE IF EXISTS ${type} CASCADE;`);
+      if (success) {
+        console.log(`✅ Dropped type: ${type}`);
+      } else {
+        console.warn(`⚠️  Could not drop type: ${type}`);
       }
     }
 
@@ -66,6 +112,10 @@ async function resetDatabase() {
 
   } catch (error) {
     console.error('❌ Reset failed:', error.message);
+    console.log('\n🔧 Troubleshooting:');
+    console.log('1. Ensure your Supabase project is active');
+    console.log('2. Verify your environment variables are correct');
+    console.log('3. Check that your service role key has the necessary permissions');
     process.exit(1);
   }
 }

@@ -20,6 +20,80 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+async function executeSql(sql) {
+  try {
+    // Use the REST API directly to execute SQL
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'apikey': supabaseServiceKey
+      },
+      body: JSON.stringify({ sql_query: sql })
+    });
+
+    if (!response.ok) {
+      // If exec_sql doesn't exist, try creating it first
+      if (response.status === 404) {
+        console.log('📝 Creating exec_sql function...');
+        await createExecSqlFunction();
+        // Retry the original query
+        return await executeSql(sql);
+      }
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.warn(`⚠️  Warning executing SQL: ${error.message}`);
+    return null;
+  }
+}
+
+async function createExecSqlFunction() {
+  const createFunctionSql = `
+    CREATE OR REPLACE FUNCTION public.exec_sql(sql_query text)
+    RETURNS void
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    AS $function$
+    BEGIN
+        EXECUTE sql_query;
+    END;
+    $function$;
+
+    GRANT EXECUTE ON FUNCTION public.exec_sql(text) TO service_role;
+  `;
+
+  try {
+    // Try to create the function using direct SQL execution
+    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sql',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'apikey': supabaseServiceKey
+      },
+      body: createFunctionSql
+    });
+
+    if (response.ok) {
+      console.log('✅ Created exec_sql function');
+    } else {
+      console.log('⚠️  Could not create exec_sql function automatically');
+      console.log('📋 Please run this SQL in your Supabase SQL Editor:');
+      console.log(createFunctionSql);
+      throw new Error('exec_sql function creation failed');
+    }
+  } catch (error) {
+    console.log('⚠️  Could not create exec_sql function automatically');
+    console.log('📋 Please run this SQL in your Supabase SQL Editor:');
+    console.log(createFunctionSql);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     console.log('🚀 Starting database migrations...');
@@ -37,57 +111,39 @@ async function runMigrations() {
     console.log(`📁 Found ${migrationFiles.length} migration files:`);
     migrationFiles.forEach(file => console.log(`   - ${file}`));
 
+    // First, ensure the exec_sql function exists
+    try {
+      await executeSql('SELECT 1');
+    } catch (error) {
+      console.log('📝 Setting up database functions...');
+      await createExecSqlFunction();
+    }
+
     for (const file of migrationFiles) {
       console.log(`\n⚡ Running migration: ${file}`);
       
       const filePath = join(migrationsDir, file);
       const sql = readFileSync(filePath, 'utf8');
       
-      // Split SQL by statements (simple approach)
-      const statements = sql
-        .split(';')
-        .map(stmt => stmt.trim())
-        .filter(stmt => stmt.length > 0 && !stmt.startsWith('--') && !stmt.startsWith('/*'));
+      // Clean up the SQL and split into statements
+      const cleanSql = sql
+        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
+        .replace(/--.*$/gm, '') // Remove single-line comments
+        .trim();
 
-      for (const statement of statements) {
-        if (statement.trim()) {
-          const { error } = await supabase.rpc('exec_sql', { sql_query: statement });
-          
-          if (error) {
-            // Try direct query if RPC fails
-            const { error: directError } = await supabase
-              .from('_temp')
-              .select('*')
-              .limit(0);
-            
-            // Execute using raw SQL
-            try {
-              const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`,
-                  'apikey': supabaseServiceKey
-                },
-                body: JSON.stringify({ sql_query: statement })
-              });
-
-              if (!response.ok) {
-                console.warn(`⚠️  Warning executing statement: ${statement.substring(0, 100)}...`);
-                console.warn(`   Response: ${response.status} ${response.statusText}`);
-              }
-            } catch (execError) {
-              console.warn(`⚠️  Warning executing statement: ${statement.substring(0, 100)}...`);
-              console.warn(`   Error: ${execError.message}`);
-            }
-          }
+      if (cleanSql) {
+        const result = await executeSql(cleanSql);
+        if (result) {
+          console.log(`✅ Completed migration: ${file}`);
+        } else {
+          console.log(`⚠️  Migration completed with warnings: ${file}`);
         }
+      } else {
+        console.log(`⏭️  Skipped empty migration: ${file}`);
       }
-      
-      console.log(`✅ Completed migration: ${file}`);
     }
 
-    console.log('\n🎉 All migrations completed successfully!');
+    console.log('\n🎉 All migrations completed!');
     console.log('\n📋 Next steps:');
     console.log('1. Verify tables were created in your Supabase dashboard');
     console.log('2. Check that RLS policies are enabled');
@@ -95,6 +151,11 @@ async function runMigrations() {
 
   } catch (error) {
     console.error('❌ Migration failed:', error.message);
+    console.log('\n🔧 Troubleshooting:');
+    console.log('1. Ensure your Supabase project is active');
+    console.log('2. Verify your environment variables are correct');
+    console.log('3. Check that your service role key has the necessary permissions');
+    console.log('4. If exec_sql function creation failed, create it manually in SQL Editor');
     process.exit(1);
   }
 }
