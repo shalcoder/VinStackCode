@@ -1,9 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Eye, Heart, Copy, Edit, Trash2, Lock, Globe, Calendar, User } from 'lucide-react';
+import { Eye, Heart, Copy, Edit, Trash2, Lock, Globe, Calendar, User, GitBranch, MessageCircle, Star } from 'lucide-react';
 import { formatRelativeTime, truncateText, copyToClipboard } from '../../utils';
 import { CODE_LANGUAGES } from '../../utils/constants';
+import { useAuth } from '../../store/authStore';
 import Button from '../ui/Button';
+import SocialShare from '../social/SocialShare';
+import FollowSystem from '../social/FollowSystem';
 
 interface SnippetCardProps {
   snippet: any;
@@ -11,6 +14,7 @@ interface SnippetCardProps {
   onDelete: (id: string) => void;
   onView: (snippet: any) => void;
   onLike?: (id: string) => void;
+  onFork?: (id: string) => void;
   showActions?: boolean;
   viewMode?: 'grid' | 'list';
 }
@@ -21,14 +25,20 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
   onDelete,
   onView,
   onLike,
+  onFork,
   showActions = true,
   viewMode = 'grid',
 }) => {
+  const { user } = useAuth();
   const language = CODE_LANGUAGES.find(lang => lang.id === snippet.language);
   const likesCount = snippet.snippet_likes?.[0]?.count || 0;
   const viewsCount = snippet.snippet_views?.[0]?.count || 0;
   const commentsCount = snippet.snippet_comments?.[0]?.count || 0;
+  const forksCount = snippet.snippet_forks?.[0]?.count || 0;
   
+  const isOwner = user?.id === snippet.owner_id;
+  const isLiked = snippet.user_liked || false;
+
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const success = await copyToClipboard(snippet.content);
@@ -50,6 +60,11 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     onLike?.(snippet.id);
+  };
+
+  const handleFork = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onFork?.(snippet.id);
   };
 
   if (viewMode === 'list') {
@@ -81,6 +96,12 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
               ) : (
                 <Globe className="w-4 h-4 text-gray-400" />
               )}
+              {snippet.is_fork && (
+                <div className="flex items-center space-x-1 text-gray-400">
+                  <GitBranch className="w-3 h-3" />
+                  <span className="text-xs">Fork</span>
+                </div>
+              )}
             </div>
             
             <p className="text-sm text-gray-400 mb-3 line-clamp-2">
@@ -97,9 +118,19 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
                 <span>{viewsCount}</span>
               </div>
               <div className="flex items-center space-x-1">
-                <Heart className="w-3 h-3" />
+                <Heart className={`w-3 h-3 ${isLiked ? 'fill-current text-red-500' : ''}`} />
                 <span>{likesCount}</span>
               </div>
+              <div className="flex items-center space-x-1">
+                <MessageCircle className="w-3 h-3" />
+                <span>{commentsCount}</span>
+              </div>
+              {forksCount > 0 && (
+                <div className="flex items-center space-x-1">
+                  <GitBranch className="w-3 h-3" />
+                  <span>{forksCount}</span>
+                </div>
+              )}
               <div className="flex items-center space-x-1">
                 <Calendar className="w-3 h-3" />
                 <span>{formatRelativeTime(new Date(snippet.updated_at))}</span>
@@ -124,25 +155,46 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
                   onClick={handleLike}
                   className="p-1"
                 >
-                  <Heart className="w-4 h-4" />
+                  <Heart className={`w-4 h-4 ${isLiked ? 'fill-current text-red-500' : ''}`} />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleEdit}
-                className="p-1"
-              >
-                <Edit className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDelete}
-                className="p-1 text-red-400 hover:text-red-300"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              {onFork && !isOwner && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleFork}
+                  className="p-1"
+                >
+                  <GitBranch className="w-4 h-4" />
+                </Button>
+              )}
+              <SocialShare snippet={{
+                id: snippet.id,
+                title: snippet.title,
+                description: snippet.description,
+                language: snippet.language,
+                author: snippet.profiles?.username || 'Unknown'
+              }} />
+              {isOwner && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEdit}
+                    className="p-1"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDelete}
+                    className="p-1 text-red-400 hover:text-red-300"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -159,9 +211,17 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-white truncate mb-1">
-            {snippet.title}
-          </h3>
+          <div className="flex items-center space-x-2 mb-1">
+            <h3 className="text-lg font-semibold text-white truncate">
+              {snippet.title}
+            </h3>
+            {snippet.is_fork && (
+              <div className="flex items-center space-x-1 text-gray-400">
+                <GitBranch className="w-3 h-3" />
+                <span className="text-xs">Fork</span>
+              </div>
+            )}
+          </div>
           <p className="text-sm text-gray-400 line-clamp-2">
             {snippet.description}
           </p>
@@ -213,6 +273,27 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
         </pre>
       </div>
 
+      {/* Author Info */}
+      {snippet.profiles && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs font-medium">
+                {snippet.profiles.username.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span className="text-sm text-gray-300">{snippet.profiles.username}</span>
+          </div>
+          {!isOwner && (
+            <FollowSystem 
+              targetUserId={snippet.owner_id}
+              targetUsername={snippet.profiles.username}
+              showFollowersCount={false}
+            />
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4 text-sm text-gray-400">
@@ -221,9 +302,19 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
             <span>{viewsCount}</span>
           </div>
           <div className="flex items-center space-x-1">
-            <Heart className="w-4 h-4" />
+            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current text-red-500' : ''}`} />
             <span>{likesCount}</span>
           </div>
+          <div className="flex items-center space-x-1">
+            <MessageCircle className="w-4 h-4" />
+            <span>{commentsCount}</span>
+          </div>
+          {forksCount > 0 && (
+            <div className="flex items-center space-x-1">
+              <GitBranch className="w-4 h-4" />
+              <span>{forksCount}</span>
+            </div>
+          )}
           <span>{formatRelativeTime(new Date(snippet.updated_at))}</span>
         </div>
 
@@ -244,25 +335,46 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
                 onClick={handleLike}
                 className="p-1"
               >
-                <Heart className="w-4 h-4" />
+                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current text-red-500' : ''}`} />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleEdit}
-              className="p-1"
-            >
-              <Edit className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              className="p-1 text-red-400 hover:text-red-300"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {onFork && !isOwner && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleFork}
+                className="p-1"
+              >
+                <GitBranch className="w-4 h-4" />
+              </Button>
+            )}
+            <SocialShare snippet={{
+              id: snippet.id,
+              title: snippet.title,
+              description: snippet.description,
+              language: snippet.language,
+              author: snippet.profiles?.username || 'Unknown'
+            }} />
+            {isOwner && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleEdit}
+                  className="p-1"
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  className="p-1 text-red-400 hover:text-red-300"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>

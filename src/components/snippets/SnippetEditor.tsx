@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Save, X, Eye, Globe, Lock } from 'lucide-react';
+import { Save, X, Eye, Globe, Lock, Sparkles, Play } from 'lucide-react';
 import { Snippet } from '../../types';
 import { CODE_LANGUAGES, DEFAULT_SNIPPET_CONTENT, POPULAR_TAGS } from '../../utils/constants';
 import { useAuthStore } from '../../store/authStore';
@@ -8,6 +8,9 @@ import { useSnippetStore } from '../../store/snippetStore';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import CodeEditor from '../editor/CodeEditor';
+import AITagGenerator from '../ai/AITagGenerator';
+import AICodeSuggestions from '../ai/AICodeSuggestions';
+import CodeExecutionSandbox from '../code/CodeExecutionSandbox';
 
 interface SnippetEditorProps {
   snippet?: Snippet;
@@ -33,6 +36,8 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
   const [code, setCode] = useState(snippet?.content || DEFAULT_SNIPPET_CONTENT.javascript);
   const [tagInput, setTagInput] = useState('');
   const [isPreview, setIsPreview] = useState(false);
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [showCodeExecution, setShowCodeExecution] = useState(false);
 
   const {
     register,
@@ -73,7 +78,7 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
   };
 
   const addTag = (tag: string) => {
-    if (tag && !selectedTags.includes(tag) && selectedTags.length < 5) {
+    if (tag && !selectedTags.includes(tag) && selectedTags.length < 10) {
       setValue('tags', [...selectedTags, tag]);
       setTagInput('');
     }
@@ -90,6 +95,17 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
     }
   };
 
+  const handleTagsGenerated = (tags: string[]) => {
+    setValue('tags', tags);
+  };
+
+  const handleApplySuggestion = (suggestedCode: string) => {
+    setCode(suggestedCode);
+  };
+
+  const supportedExecutionLanguages = ['javascript', 'html', 'css', 'python'];
+  const canExecute = supportedExecutionLanguages.includes(selectedLanguage);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -98,6 +114,24 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
           {snippet ? 'Edit Snippet' : 'Create New Snippet'}
         </h2>
         <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAISuggestions(!showAISuggestions)}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            AI Assist
+          </Button>
+          {canExecute && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCodeExecution(!showCodeExecution)}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Run
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -190,16 +224,26 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
-                Tags ({selectedTags.length}/5)
+                Tags ({selectedTags.length}/10)
               </label>
               <Input
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyPress={handleTagKeyPress}
                 placeholder="Add tags..."
-                disabled={selectedTags.length >= 5}
+                disabled={selectedTags.length >= 10}
               />
               
+              {/* AI Tag Generator */}
+              <div className="mt-3">
+                <AITagGenerator
+                  code={code}
+                  language={selectedLanguage}
+                  existingTags={selectedTags}
+                  onTagsGenerated={handleTagsGenerated}
+                />
+              </div>
+
               {/* Popular tags */}
               <div className="mt-2">
                 <p className="text-xs text-gray-400 mb-2">Popular tags:</p>
@@ -209,7 +253,7 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
                       key={tag}
                       type="button"
                       onClick={() => addTag(tag)}
-                      disabled={selectedTags.includes(tag) || selectedTags.length >= 5}
+                      disabled={selectedTags.includes(tag) || selectedTags.length >= 10}
                       className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {tag}
@@ -242,8 +286,8 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
           </div>
 
           {/* Code Editor */}
-          <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+          <div className="lg:col-span-2 space-y-4">
+            <label className="block text-sm font-medium text-gray-300">
               Code
             </label>
             <CodeEditor
@@ -253,6 +297,14 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
               readOnly={isPreview}
               height="500px"
             />
+
+            {/* Code Execution */}
+            {showCodeExecution && canExecute && (
+              <CodeExecutionSandbox
+                code={code}
+                language={selectedLanguage}
+              />
+            )}
           </div>
         </div>
 
@@ -277,6 +329,15 @@ const SnippetEditor: React.FC<SnippetEditorProps> = ({
           </div>
         </div>
       </form>
+
+      {/* AI Suggestions Panel */}
+      <AICodeSuggestions
+        code={code}
+        language={selectedLanguage}
+        onApplySuggestion={handleApplySuggestion}
+        isVisible={showAISuggestions}
+        onClose={() => setShowAISuggestions(false)}
+      />
     </div>
   );
 };
