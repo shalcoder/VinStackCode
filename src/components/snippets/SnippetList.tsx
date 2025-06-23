@@ -1,16 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Snippet } from '../../types';
 import SnippetCard from './SnippetCard';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface SnippetListProps {
-  snippets: Snippet[];
+  snippets: any[];
   isLoading: boolean;
-  onEdit: (snippet: Snippet) => void;
+  onEdit: (snippet: any) => void;
   onDelete: (id: string) => void;
-  onView: (snippet: Snippet) => void;
+  onView: (snippet: any) => void;
+  onLike?: (id: string) => void;
   showActions?: boolean;
+  viewMode?: 'grid' | 'list';
 }
 
 const SnippetList: React.FC<SnippetListProps> = ({
@@ -19,7 +20,9 @@ const SnippetList: React.FC<SnippetListProps> = ({
   onEdit,
   onDelete,
   onView,
-  showActions = true
+  onLike,
+  showActions = true,
+  viewMode = 'grid',
 }) => {
   if (isLoading) {
     return (
@@ -43,8 +46,12 @@ const SnippetList: React.FC<SnippetListProps> = ({
     );
   }
 
+  const gridClasses = viewMode === 'grid' 
+    ? 'grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6'
+    : 'space-y-4';
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className={gridClasses}>
       {snippets.map((snippet, index) => (
         <motion.div
           key={snippet.id}
@@ -57,7 +64,9 @@ const SnippetList: React.FC<SnippetListProps> = ({
             onEdit={onEdit}
             onDelete={onDelete}
             onView={onView}
+            onLike={onLike}
             showActions={showActions}
+            viewMode={viewMode}
           />
         </motion.div>
       ))}
