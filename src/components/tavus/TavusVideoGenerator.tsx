@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Wand2, Play, Download, Share2, X, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import Button from '../ui/Button';
@@ -117,7 +117,6 @@ Feel free to fork this snippet and experiment with the code yourself!`;
         .from('snippets')
         .update({ 
           custom_fields: { 
-            ...snippetCode, 
             video_url: videoUrl,
             video_generated_at: new Date().toISOString()
           }
