@@ -69,28 +69,37 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
       setError('');
       setIsCreatingDemo(true);
       
-      // First try to create the demo account
-      await signUp('developer@vinstack.com', 'password123', 'developer');
+      // Create the demo account - database triggers will handle profile/subscription creation
+      const result = await signUp('developer@vinstack.com', 'password123', 'developer');
       
-      // If successful, automatically sign in
-      setTimeout(async () => {
-        try {
-          await signIn('developer@vinstack.com', 'password123');
-        } catch (signInErr: any) {
-          console.error('Auto sign-in after demo creation failed:', signInErr);
-          setError('Demo account created! Please try logging in now.');
+      if (result.user) {
+        // If email confirmation is disabled, the user should be automatically signed in
+        // If email confirmation is enabled, show a message
+        if (result.session) {
+          // User is automatically signed in
+          setError('');
+        } else {
+          // Email confirmation required
+          setError('Demo account created! Please check your email for confirmation, or try logging in if email confirmation is disabled.');
         }
-      }, 1000);
+      }
       
     } catch (err: any) {
       console.error('Demo account creation error:', err);
-      if (err.message?.includes('already registered')) {
+      if (err.message?.includes('already registered') || err.message?.includes('already been registered')) {
         // Account exists, try to sign in directly
         try {
           await signIn('developer@vinstack.com', 'password123');
+          setError('');
         } catch (signInErr: any) {
-          setError('Demo account exists but login failed. Please check your Supabase email confirmation settings.');
+          if (signInErr.message?.includes('Email not confirmed')) {
+            setError('Demo account exists but email needs confirmation. Please check your email or contact support.');
+          } else {
+            setError('Demo account exists but login failed. Please try the login button.');
+          }
         }
+      } else if (err.message?.includes('Email not confirmed')) {
+        setError('Demo account created but email confirmation is required. Please check your email.');
       } else {
         setError(err.message || 'Failed to create demo account.');
       }

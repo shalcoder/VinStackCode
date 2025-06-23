@@ -2,68 +2,55 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
 
-type Snippet = Database['public']['Tables']['snippets']['Row'] & {
-  profiles: Database['public']['Tables']['profiles']['Row'];
-  snippet_likes: { count: number }[];
-  snippet_views: { count: number }[];
-  snippet_comments: { count: number }[];
-};
-
+type Snippet = Database['public']['Tables']['snippets']['Row'];
 type SnippetInsert = Database['public']['Tables']['snippets']['Insert'];
 type SnippetUpdate = Database['public']['Tables']['snippets']['Update'];
 
-export const useSnippets = () => {
+export const useSnippets = (userId?: string) => {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSnippets = async (filters?: {
-    visibility?: 'public' | 'private' | 'team';
-    language?: string;
-    tags?: string[];
-    search?: string;
-    ownerId?: string;
-  }) => {
+  const fetchSnippets = async () => {
     try {
       setLoading(true);
+      setError(null);
+
       let query = supabase
         .from('snippets')
         .select(`
           *,
-          profiles!snippets_owner_id_fkey(username, avatar_url),
-          snippet_likes(count),
-          snippet_views(count),
-          snippet_comments(count)
+          profiles:owner_id (
+            username,
+            full_name,
+            avatar_url
+          )
         `)
         .eq('is_archived', false)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
-      if (filters?.visibility) {
-        query = query.eq('visibility', filters.visibility);
+      if (userId) {
+        query = query.eq('owner_id', userId);
+      } else {
+        // If no userId provided, show public snippets
+        query = query.eq('visibility', 'public');
       }
 
-      if (filters?.language) {
-        query = query.eq('language', filters.language);
+      const { data, error: fetchError } = await query;
+
+      if (fetchError) {
+        throw fetchError;
       }
 
-      if (filters?.tags && filters.tags.length > 0) {
-        query = query.overlaps('tags', filters.tags);
-      }
-
-      if (filters?.search) {
-        query = query.textSearch('search_vector', filters.search);
-      }
-
-      if (filters?.ownerId) {
-        query = query.eq('owner_id', filters.ownerId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
       setSnippets(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (err: any) {
+      console.error('Error fetching snippets:', err);
+      setError(err.message || 'Failed to fetch snippets');
+      
+      // If it's a network error, set empty array instead of keeping loading state
+      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+        setSnippets([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -74,21 +61,16 @@ export const useSnippets = () => {
       const { data, error } = await supabase
         .from('snippets')
         .insert(snippet)
-        .select(`
-          *,
-          profiles!snippets_owner_id_fkey(username, avatar_url),
-          snippet_likes(count),
-          snippet_views(count),
-          snippet_comments(count)
-        `)
+        .select()
         .single();
 
       if (error) throw error;
 
       setSnippets(prev => [data, ...prev]);
       return data;
-    } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to create snippet');
+    } catch (err: any) {
+      console.error('Error creating snippet:', err);
+      throw err;
     }
   };
 
@@ -98,23 +80,20 @@ export const useSnippets = () => {
         .from('snippets')
         .update(updates)
         .eq('id', id)
-        .select(`
-          *,
-          profiles!snippets_owner_id_fkey(username, avatar_url),
-          snippet_likes(count),
-          snippet_views(count),
-          snippet_comments(count)
-        `)
+        .select()
         .single();
 
       if (error) throw error;
 
       setSnippets(prev => 
-        prev.map(snippet => snippet.id === id ? data : snippet)
+        prev.map(snippet => 
+          snippet.id === id ? data : snippet
+        )
       );
       return data;
-    } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to update snippet');
+    } catch (err: any) {
+      console.error('Error updating snippet:', err);
+      throw err;
     }
   };
 
@@ -128,92 +107,75 @@ export const useSnippets = () => {
       if (error) throw error;
 
       setSnippets(prev => prev.filter(snippet => snippet.id !== id));
-    } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to delete snippet');
+    } catch (err: any) {
+      console.error('Error deleting snippet:', err);
+      throw err;
     }
   };
 
-  const likeSnippet = async (snippetId: string, userId: string) => {
+  const searchSnippets = async (query: string, filters?: {
+    language?: string;
+    tags?: string[];
+    visibility?: string;
+  }) => {
     try {
-      // Check if already liked
-      const { data: existingLike } = await supabase
-        .from('snippet_likes')
-        .select('id')
-        .eq('snippet_id', snippetId)
-        .eq('user_id', userId)
-        .single();
+      setLoading(true);
+      setError(null);
 
-      if (existingLike) {
-        // Unlike
-        const { error } = await supabase
-          .from('snippet_likes')
-          .delete()
-          .eq('snippet_id', snippetId)
-          .eq('user_id', userId);
+      let supabaseQuery = supabase
+        .from('snippets')
+        .select(`
+          *,
+          profiles:owner_id (
+            username,
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq('is_archived', false);
 
-        if (error) throw error;
-      } else {
-        // Like
-        const { error } = await supabase
-          .from('snippet_likes')
-          .insert({ snippet_id: snippetId, user_id: userId });
-
-        if (error) throw error;
+      if (query) {
+        supabaseQuery = supabaseQuery.textSearch('search_vector', query);
       }
 
-      // Refresh snippets to update like count
-      await fetchSnippets();
-    } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to toggle like');
-    }
-  };
+      if (filters?.language) {
+        supabaseQuery = supabaseQuery.eq('language', filters.language);
+      }
 
-  const forkSnippet = async (snippetId: string, userId: string) => {
-    try {
-      // Get original snippet
-      const { data: original, error: fetchError } = await supabase
-        .from('snippets')
-        .select('*')
-        .eq('id', snippetId)
-        .single();
+      if (filters?.tags && filters.tags.length > 0) {
+        supabaseQuery = supabaseQuery.overlaps('tags', filters.tags);
+      }
 
-      if (fetchError) throw fetchError;
+      if (filters?.visibility) {
+        supabaseQuery = supabaseQuery.eq('visibility', filters.visibility);
+      } else if (!userId) {
+        // Default to public if no user context
+        supabaseQuery = supabaseQuery.eq('visibility', 'public');
+      }
 
-      // Create fork
-      const forkData: SnippetInsert = {
-        title: `${original.title} (Fork)`,
-        description: original.description,
-        content: original.content,
-        language: original.language,
-        tags: original.tags,
-        visibility: 'private',
-        owner_id: userId,
-        custom_fields: {
-          ...original.custom_fields,
-          forked_from: snippetId,
-        },
-      };
+      if (userId) {
+        supabaseQuery = supabaseQuery.eq('owner_id', userId);
+      }
 
-      return await createSnippet(forkData);
-    } catch (err) {
-      throw err instanceof Error ? err : new Error('Failed to fork snippet');
-    }
-  };
+      const { data, error: searchError } = await supabaseQuery
+        .order('updated_at', { ascending: false });
 
-  const incrementViews = async (snippetId: string, userId?: string) => {
-    try {
-      await supabase.rpc('increment_snippet_views', {
-        snippet_uuid: snippetId,
-        user_uuid: userId,
-      });
-    } catch (err) {
-      console.error('Failed to increment views:', err);
+      if (searchError) throw searchError;
+
+      setSnippets(data || []);
+      return data || [];
+    } catch (err: any) {
+      console.error('Error searching snippets:', err);
+      setError(err.message || 'Failed to search snippets');
+      return [];
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchSnippets();
-  }, []);
+  }, [userId]);
 
   return {
     snippets,
@@ -223,8 +185,6 @@ export const useSnippets = () => {
     createSnippet,
     updateSnippet,
     deleteSnippet,
-    likeSnippet,
-    forkSnippet,
-    incrementViews,
+    searchSnippets,
   };
 };

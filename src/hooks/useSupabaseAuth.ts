@@ -43,15 +43,35 @@ export const useSupabaseAuth = () => {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      // Add retry logic for profile fetching
+      let retries = 3;
+      let data = null;
+      let error = null;
 
-      if (error) {
+      while (retries > 0 && !data) {
+        const result = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        data = result.data;
+        error = result.error;
+
+        if (error && error.code === 'PGRST116') {
+          // Profile doesn't exist yet, wait a bit for trigger to create it
+          retries--;
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
-      } else {
+      } else if (data) {
         setProfile(data);
       }
     } catch (error) {
@@ -62,46 +82,22 @@ export const useSupabaseAuth = () => {
   };
 
   const signUp = async (email: string, password: string, username: string) => {
+    // Only handle the auth signup - let database triggers handle profile/subscription creation
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           username,
+          full_name: username,
         },
       },
     });
 
     if (error) throw error;
 
-    // Create profile
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,
-          username,
-          full_name: username,
-        });
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-      }
-
-      // Create subscription record
-      const { error: subscriptionError } = await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: data.user.id,
-          plan: 'free',
-          status: 'active',
-        });
-
-      if (subscriptionError) {
-        console.error('Error creating subscription:', subscriptionError);
-      }
-    }
-
+    // The handle_new_user trigger should automatically create the profile and subscription
+    // We don't need to manually create them here
     return data;
   };
 
