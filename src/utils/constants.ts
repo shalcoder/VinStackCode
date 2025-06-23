@@ -905,10 +905,10 @@ ORDER BY total_count DESC;
 set -euo pipefail
 
 # Configuration
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_NAME="vinstack-code"
 readonly DOCKER_IMAGE="vinstack/code-platform"
-readonly VERSION="${VERSION:-latest}"
+readonly VERSION="\${VERSION:-latest}"
 
 # Colors for output
 readonly RED='\\033[0;31m'
@@ -919,19 +919,19 @@ readonly NC='\\033[0m' # No Color
 
 # Logging functions
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "\${BLUE}[INFO]\${NC} $1"
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "\${GREEN}[SUCCESS]\${NC} $1"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "\${YELLOW}[WARNING]\${NC} $1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1" >&2
+    echo -e "\${RED}[ERROR]\${NC} $1" >&2
 }
 
 # Check if required tools are installed
@@ -939,14 +939,14 @@ check_dependencies() {
     local deps=("docker" "docker-compose" "node" "npm")
     local missing=()
     
-    for dep in "${deps[@]}"; do
+    for dep in "\${deps[@]}"; do
         if ! command -v "$dep" &> /dev/null; then
             missing+=("$dep")
         fi
     done
     
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        log_error "Missing dependencies: ${missing[*]}"
+    if [[ \${#missing[@]} -gt 0 ]]; then
+        log_error "Missing dependencies: \${missing[*]}"
         log_info "Please install the missing dependencies and try again."
         exit 1
     fi
@@ -1011,7 +1011,7 @@ setup_database() {
     npm run db:migrate
     
     # Seed development data
-    if [[ "${NODE_ENV:-development}" == "development" ]]; then
+    if [[ "\${NODE_ENV:-development}" == "development" ]]; then
         log_info "Seeding development data..."
         npm run db:seed
     fi
@@ -1032,15 +1032,15 @@ build_app() {
     
     # Build Docker image
     log_info "Building Docker image..."
-    docker build -t "${DOCKER_IMAGE}:${VERSION}" .
-    docker tag "${DOCKER_IMAGE}:${VERSION}" "${DOCKER_IMAGE}:latest"
+    docker build -t "\${DOCKER_IMAGE}:\${VERSION}" .
+    docker tag "\${DOCKER_IMAGE}:\${VERSION}" "\${DOCKER_IMAGE}:latest"
     
     log_success "Application build complete"
 }
 
 # Deploy application
 deploy() {
-    local environment="${1:-staging}"
+    local environment="\${1:-staging}"
     
     log_info "Deploying VinStackCode to $environment..."
     
@@ -1092,7 +1092,7 @@ deploy_production() {
     
     # Build and push image
     build_app
-    docker push "${DOCKER_IMAGE}:${VERSION}"
+    docker push "\${DOCKER_IMAGE}:\${VERSION}"
     
     # Deploy using blue-green strategy
     blue_green_deploy
@@ -1291,7 +1291,7 @@ EOF
 
 # Main function
 main() {
-    local command="${1:-}"
+    local command="\${1:-}"
     
     case "$command" in
         "setup")
@@ -1302,13 +1302,13 @@ main() {
             build_app
             ;;
         "deploy")
-            deploy "${2:-staging}"
+            deploy "\${2:-staging}"
             ;;
         "backup")
             backup_database
             ;;
         "restore")
-            restore_database "${2:-}"
+            restore_database "\${2:-}"
             ;;
         "monitor")
             monitor
