@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -19,7 +19,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useSupabaseAuth();
+  const [isCreatingDemo, setIsCreatingDemo] = useState(false);
+  const { signIn, signUp } = useSupabaseAuth();
 
   const {
     register,
@@ -40,7 +41,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
     } catch (err: any) {
       console.error('Login error:', err);
       if (err.message?.includes('Invalid login credentials')) {
-        setError('Invalid email or password. Try creating an account first.');
+        setError('Invalid email or password. If using demo credentials, you may need to create the demo account first.');
       } else {
         setError(err.message || 'Login failed. Please try again.');
       }
@@ -60,6 +61,41 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         passwordInput.value = 'password123';
         form.requestSubmit();
       }
+    }
+  };
+
+  const createDemoAccount = async () => {
+    try {
+      setError('');
+      setIsCreatingDemo(true);
+      
+      // First try to create the demo account
+      await signUp('developer@vinstack.com', 'password123', 'developer');
+      
+      // If successful, automatically sign in
+      setTimeout(async () => {
+        try {
+          await signIn('developer@vinstack.com', 'password123');
+        } catch (signInErr: any) {
+          console.error('Auto sign-in after demo creation failed:', signInErr);
+          setError('Demo account created! Please try logging in now.');
+        }
+      }, 1000);
+      
+    } catch (err: any) {
+      console.error('Demo account creation error:', err);
+      if (err.message?.includes('already registered')) {
+        // Account exists, try to sign in directly
+        try {
+          await signIn('developer@vinstack.com', 'password123');
+        } catch (signInErr: any) {
+          setError('Demo account exists but login failed. Please check your Supabase email confirmation settings.');
+        }
+      } else {
+        setError(err.message || 'Failed to create demo account.');
+      }
+    } finally {
+      setIsCreatingDemo(false);
     }
   };
 
@@ -148,21 +184,34 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-gray-300">Demo Account</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleDemoLogin}
-              disabled={isLoading}
-            >
-              Use Demo
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDemoLogin}
+                disabled={isLoading || isCreatingDemo}
+              >
+                Use Demo
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={createDemoAccount}
+                disabled={isLoading || isCreatingDemo}
+                isLoading={isCreatingDemo}
+              >
+                <UserPlus className="w-3 h-3 mr-1" />
+                Create Demo
+              </Button>
+            </div>
           </div>
           <div className="text-xs text-gray-400 space-y-1">
             <p><strong>Email:</strong> developer@vinstack.com</p>
             <p><strong>Password:</strong> password123</p>
-            <p className="text-yellow-400 mt-2">
-              ⚠️ If demo login fails, please create this account first by signing up.
+            <p className="text-blue-400 mt-2">
+              💡 Click "Create Demo" to set up the demo account, then "Use Demo" to login.
             </p>
           </div>
         </div>
