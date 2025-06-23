@@ -12,6 +12,7 @@ import Toast from '../components/ui/Toast';
 import TavusVideoComments from '../components/tavus/TavusVideoComments';
 import SocialShare from '../components/social/SocialShare';
 import FollowSystem from '../components/social/FollowSystem';
+import TavusVideoGenerator from '../components/tavus/TavusVideoGenerator';
 
 const SnippetViewPage: React.FC = () => {
   const { id } = useParams();
