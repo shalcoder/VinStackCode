@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
+import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 
@@ -18,20 +18,48 @@ interface FormData {
 const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { login, isLoading } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn } = useSupabaseAuth();
 
   const {
     register,
     handleSubmit,
     formState: { errors }
-  } = useForm<FormData>();
+  } = useForm<FormData>({
+    defaultValues: {
+      email: 'developer@vinstack.com',
+      password: 'password123'
+    }
+  });
 
   const onSubmit = async (data: FormData) => {
     try {
       setError('');
-      await login(data.email, data.password);
-    } catch (err) {
-      setError('Invalid email or password');
+      setIsLoading(true);
+      await signIn(data.email, data.password);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.message?.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Try creating an account first.');
+      } else {
+        setError(err.message || 'Login failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = () => {
+    // Auto-fill demo credentials
+    const form = document.querySelector('form') as HTMLFormElement;
+    if (form) {
+      const emailInput = form.querySelector('input[name="email"]') as HTMLInputElement;
+      const passwordInput = form.querySelector('input[name="password"]') as HTMLInputElement;
+      if (emailInput && passwordInput) {
+        emailInput.value = 'developer@vinstack.com';
+        passwordInput.value = 'password123';
+        form.requestSubmit();
+      }
     }
   };
 
@@ -88,7 +116,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           </div>
 
           {error && (
-            <div className="text-red-400 text-sm text-center">{error}</div>
+            <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
+              {error}
+            </div>
           )}
 
           <Button
@@ -115,12 +145,26 @@ const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           </p>
         </div>
 
-        <div className="mt-4 p-4 bg-gray-800 rounded-lg">
-          <p className="text-sm text-gray-400 mb-2">Demo credentials:</p>
-          <p className="text-xs text-gray-500">
-            Email: developer@vinstack.com<br />
-            Password: password
-          </p>
+        <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-gray-300">Demo Account</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDemoLogin}
+              disabled={isLoading}
+            >
+              Use Demo
+            </Button>
+          </div>
+          <div className="text-xs text-gray-400 space-y-1">
+            <p><strong>Email:</strong> developer@vinstack.com</p>
+            <p><strong>Password:</strong> password123</p>
+            <p className="text-yellow-400 mt-2">
+              ⚠️ If demo login fails, please create this account first by signing up.
+            </p>
+          </div>
         </div>
       </div>
     </motion.div>

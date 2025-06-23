@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
+import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 
@@ -20,7 +20,8 @@ interface FormData {
 const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { register: registerUser, isLoading } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const { signUp } = useSupabaseAuth();
 
   const {
     register,
@@ -34,9 +35,31 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
   const onSubmit = async (data: FormData) => {
     try {
       setError('');
-      await registerUser(data.username, data.email, data.password);
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+      setIsLoading(true);
+      await signUp(data.email, data.password, data.username);
+      // Note: User will need to confirm email if email confirmation is enabled
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createDemoAccount = async () => {
+    try {
+      setError('');
+      setIsLoading(true);
+      await signUp('developer@vinstack.com', 'password123', 'developer');
+    } catch (err: any) {
+      console.error('Demo account creation error:', err);
+      if (err.message?.includes('already registered')) {
+        setError('Demo account already exists. Please use the login form.');
+      } else {
+        setError(err.message || 'Failed to create demo account.');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -125,7 +148,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
           />
 
           {error && (
-            <div className="text-red-400 text-sm text-center">{error}</div>
+            <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-800 rounded-lg p-3">
+              {error}
+            </div>
           )}
 
           <Button
@@ -149,6 +174,24 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
             >
               Sign in
             </button>
+          </p>
+        </div>
+
+        <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-gray-300">Quick Demo</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={createDemoAccount}
+              disabled={isLoading}
+            >
+              Create Demo Account
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400">
+            Create the demo account (developer@vinstack.com) to test the platform with sample data.
           </p>
         </div>
       </div>
