@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 
 // ElevenLabs API configuration
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1';
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || 'demo-key';
+const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || 'sk_62615686dbcdc926805170513cb3078b21762844216790b9';
 
 // Default voice IDs
 const DEFAULT_VOICES = {
