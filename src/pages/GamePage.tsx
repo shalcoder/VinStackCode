@@ -6,13 +6,15 @@ import { useAuth } from '../store/authStore';
 import { useGameStore } from '../store/gameStore';
 import GameDashboard from '../components/game/GameDashboard';
 import AIMentor from '../components/game/AIMentor';
-import Button from '../components/ui/Button';
+import MultiplayerArena from '../components/game/MultiplayerArena';
+import Button from '../ui/Button';
 
 const GamePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { player, initializePlayer, aiMentorActive, activateAIMentor, deactivateAIMentor } = useGameStore();
   const [showIntro, setShowIntro] = useState(true);
+  const [showMultiplayer, setShowMultiplayer] = useState(false);
 
   useEffect(() => {
     // Initialize player if not exists
@@ -143,10 +145,28 @@ const GamePage: React.FC = () => {
     );
   }
 
+  if (showMultiplayer) {
+    return (
+      <div className="min-h-screen bg-gray-950">
+        <MultiplayerArena onClose={() => setShowMultiplayer(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-950">
       <GameDashboard />
       <AIMentor isActive={aiMentorActive} onToggle={toggleAIMentor} />
+      
+      {/* Multiplayer Button */}
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        className="fixed bottom-6 left-6 bg-purple-600 text-white rounded-full p-4 shadow-lg z-10"
+        onClick={() => setShowMultiplayer(true)}
+      >
+        <Users className="w-6 h-6" />
+      </motion.button>
     </div>
   );
 };
