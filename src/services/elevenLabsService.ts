@@ -2,7 +2,8 @@ import { supabase } from '../lib/supabase';
 
 // ElevenLabs API configuration
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1';
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || 'sk_62615686dbcdc926805170513cb3078b21762844216790b9';
+const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+// Remove hardcoded fallback for security
 
 // Default voice IDs
 const DEFAULT_VOICES = {
@@ -37,102 +38,119 @@ export const elevenLabsService = {
       const {
         text,
         voiceId = DEFAULT_VOICES.neutral,
-        modelId = 'eleven_monolingual_v1',
+        modelId = 'eleven_multilingual_v2', // Updated for multilingual support
         stability = 0.5,
         similarityBoost = 0.75,
         style = 0,
         speakerBoost = true,
       } = request;
 
-      // For the hackathon, we'll mock the API response
-      console.log(`Using ElevenLabs API key: ${ELEVENLABS_API_KEY}`);
-      console.log(`Converting text to speech: "${text.substring(0, 50)}..."`);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Generate a mock audio URL
-      // In a real implementation, this would be the URL returned by ElevenLabs
-      const audioId = `eleven_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const mockAudioUrl = `https://elevenlabs-samples.s3.amazonaws.com/${audioId}.mp3`;
-      
-      // Track usage in analytics
-      await trackVoiceGeneration(text, voiceId);
-      
-      return mockAudioUrl;
+      if (!ELEVENLABS_API_KEY) {
+        throw new Error('ElevenLabs API key is not configured');
+      }
+
+      console.log(`Converting text to speech: "${text.substring(0, 50)}..." with voice ${voiceId}`);
+
+      // Real API call (replace mock for demo)
+      const response = await fetch(`${ELEVENLABS_API_URL}/text-to-speech/${voiceId}/stream`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: modelId,
+          voice_settings: { stability, similarity_boost: similarityBoost, style, speaker_boost: speakerBoost },
+          optimize_streaming_latency: 2, // Strong latency optimization
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`ElevenLabs API error: ${errorData.message || response.statusText}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      await trackVoiceGeneration(text, voiceId, audioBlob.size); // Track usage
+      return audioUrl;
     } catch (error) {
       console.error('Error generating speech with ElevenLabs:', error);
-      throw new Error('Failed to generate speech');
+      throw new Error(`Failed to generate speech: ${error.message}`);
     }
   },
-  
+
   /**
    * Get available voices from ElevenLabs
    */
   getVoices: async () => {
     try {
-      // In a real implementation, this would call the ElevenLabs API
-      // For the hackathon, we'll return mock data
-      
-      return [
-        {
-          voice_id: DEFAULT_VOICES.male,
-          name: 'Adam',
-          category: 'premade',
-          description: 'A professional male voice with a neutral accent',
-        },
-        {
-          voice_id: DEFAULT_VOICES.female,
-          name: 'Rachel',
-          category: 'premade',
-          description: 'A professional female voice with a neutral accent',
-        },
-        {
-          voice_id: DEFAULT_VOICES.neutral,
-          name: 'Domi',
-          category: 'premade',
-          description: 'A neutral voice with a balanced tone',
-        },
-      ];
+      if (!ELEVENLABS_API_KEY) {
+        throw new Error('ElevenLabs API key is not configured');
+      }
+
+      const response = await fetch(`${ELEVENLABS_API_URL}/voices`, {
+        headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch voices: ${response.statusText}`);
+      }
+
+      return await response.json();
     } catch (error) {
       console.error('Error fetching ElevenLabs voices:', error);
-      return [];
+      return Object.values(DEFAULT_VOICES).map(voiceId => ({
+        voice_id: voiceId,
+        name: voiceId === DEFAULT_VOICES.male ? 'Adam' : voiceId === DEFAULT_VOICES.female ? 'Rachel' : 'Domi',
+        category: 'premade',
+        description: 'Mock voice',
+      }));
     }
   },
-  
+
   /**
    * Get user's subscription info from ElevenLabs
    */
   getUserSubscription: async () => {
     try {
-      // Mock subscription data
+      if (!ELEVENLABS_API_KEY) {
+        throw new Error('ElevenLabs API key is not configured');
+      }
+
+      const response = await fetch(`${ELEVENLABS_API_URL}/user/subscription`, {
+        headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch subscription: ${response.statusText}`);
+      }
+
+      const data = await response.json();
       return {
-        tier: 'free',
-        character_count: 10000,
-        character_limit: 10000,
-        can_extend_character_limit: true,
-        allowed_to_extend_character_limit: true,
-        next_character_count_reset_unix: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        voice_limit: 3,
-        professional_voice_limit: 0,
-        can_extend_voice_limit: true,
-        can_use_instant_voice_cloning: true,
-        can_use_professional_voice_cloning: false,
-        currency: 'USD',
+        ...data,
+        remainingTokens: data.character_limit - data.character_count, // Custom field
       };
     } catch (error) {
       console.error('Error fetching ElevenLabs subscription:', error);
-      return null;
+      return {
+        tier: 'free',
+        character_count: 0,
+        character_limit: 599000, // Your custom limit
+        remainingTokens: 599000,
+        next_character_count_reset_unix: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      };
     }
   },
 };
 
 // Helper function to track voice generation in analytics
-async function trackVoiceGeneration(text: string, voiceId: string) {
+async function trackVoiceGeneration(text: string, voiceId: string, byteSize?: number) {
   try {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) return;
-    
+
     await supabase.from('activities').insert({
       user_id: user.id,
       type: 'create',
@@ -141,7 +159,8 @@ async function trackVoiceGeneration(text: string, voiceId: string) {
       description: 'Generated voice feedback',
       metadata: {
         text_length: text.length,
-        voice_id: voiceId,
+        byte_size: byteSize,
+        voice_id,
         provider: 'elevenlabs',
       },
     });
