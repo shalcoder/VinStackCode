@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Crown, Zap, Star } from 'lucide-react';
+import { ArrowLeft, Crown, Zap, Star, Users } from 'lucide-react';
 import { useAuth } from '../store/authStore';
 import { useGameStore } from '../store/gameStore';
 import GameDashboard from '../components/game/GameDashboard';
 import AIMentor from '../components/game/AIMentor';
 import MultiplayerArena from '../components/game/MultiplayerArena';
-import Button from '../ui/Button';
+import Button from '../components/ui/Button';
 
 const GamePage: React.FC = () => {
   const navigate = useNavigate();
