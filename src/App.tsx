@@ -8,6 +8,7 @@ import SnippetViewPage from './pages/SnippetViewPage';
 import TeamManagementPage from './pages/TeamManagementPage';
 import IntegrationsPage from './pages/IntegrationsPage';
 import PricingPage from './components/payment/PricingPage';
+import GamePage from './pages/GamePage';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 
 function App() {
@@ -42,6 +43,7 @@ function App() {
         <Route path="/teams" element={<TeamManagementPage />} />
         <Route path="/integrations" element={<IntegrationsPage />} />
         <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
+        <Route path="/game" element={<GamePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

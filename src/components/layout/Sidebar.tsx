@@ -12,10 +12,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Crown,
-  CreditCard
+  CreditCard,
+  Gamepad2
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../ui/Button';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   activeTab: string;
@@ -23,6 +25,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user, logout } = useAuthStore();
 
@@ -31,6 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'my-snippets', label: 'My Snippets', icon: Code2 },
     { id: 'favorites', label: 'Favorites', icon: Star },
     { id: 'archived', label: 'Archived', icon: Archive },
+    { id: 'game', label: 'Coding Game', icon: Gamepad2 },
   ];
 
   const handleLogout = () => {
@@ -51,6 +55,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
 
   const planBadge = getPlanBadge();
   const PlanIcon = planBadge.icon;
+
+  const handleTabClick = (tabId: string) => {
+    if (tabId === 'game') {
+      navigate('/game');
+    } else {
+      onTabChange(tabId);
+    }
+  };
 
   return (
     <motion.aside
@@ -99,25 +111,31 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       <nav className="flex-1 px-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = activeTab === item.id || (item.id === 'game' && window.location.pathname === '/game');
           
           return (
             <motion.button
               key={item.id}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => onTabChange(item.id)}
+              onClick={() => handleTabClick(item.id)}
               className={`
                 w-full flex items-center px-3 py-2 mb-1 rounded-lg text-left transition-colors
                 ${isActive 
                   ? 'bg-primary-600 text-white' 
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                 }
+                ${item.id === 'game' ? 'relative' : ''}
               `}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               {!isCollapsed && (
                 <span className="ml-3 font-medium">{item.label}</span>
+              )}
+              {item.id === 'game' && (
+                <span className="absolute right-2 top-1 px-1.5 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                  New
+                </span>
               )}
             </motion.button>
           );
