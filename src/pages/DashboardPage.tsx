@@ -13,6 +13,7 @@ import NotificationCenter from '../components/notifications/NotificationCenter';
 import CommandPalette from '../components/ui/CommandPalette';
 import Button from '../components/ui/Button';
 import Toast from '../components/ui/Toast';
+import GameBanner from '../components/game/GameBanner';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -105,6 +106,8 @@ const DashboardPage: React.FC = () => {
       navigate('/integrations');
     } else if (tab === 'pricing') {
       navigate('/pricing');
+    } else if (tab === 'game') {
+      navigate('/game');
     }
   };
 
@@ -189,6 +192,9 @@ const DashboardPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
+            {/* Game Banner */}
+            <GameBanner />
+            
             {/* Tab Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
