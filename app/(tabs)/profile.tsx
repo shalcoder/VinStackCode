@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Edit, Settings, MapPin, Globe, Calendar, Grid, Bookmark, Heart } from 'lucide-react-native';
+import { CreditCard as Edit, Settings, MapPin, Globe, Calendar, Grid2x2 as Grid, Bookmark, Heart } from 'lucide-react-native';
 
 const STATS = [
   { label: 'Posts', value: 248 },
