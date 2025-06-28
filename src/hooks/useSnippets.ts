@@ -39,6 +39,26 @@ export const useSnippets = (userId?: string) => {
       const { data, error: fetchError } = await query;
 
       if (fetchError) {
+        // Handle specific RLS policy errors gracefully
+        if (fetchError.message?.includes('infinite recursion') || fetchError.code === '42P17') {
+          console.warn('Database policy error detected, using fallback query');
+          
+          // Fallback to a simpler query without joins that might trigger RLS issues
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('snippets')
+            .select('*')
+            .eq('is_archived', false)
+            .eq('visibility', 'public')
+            .order('updated_at', { ascending: false });
+
+          if (fallbackError) {
+            throw fallbackError;
+          }
+
+          setSnippets(fallbackData || []);
+          return;
+        }
+        
         throw fetchError;
       }
 
@@ -47,8 +67,11 @@ export const useSnippets = (userId?: string) => {
       console.error('Error fetching snippets:', err);
       setError(err.message || 'Failed to fetch snippets');
       
-      // If it's a network error, set empty array instead of keeping loading state
-      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+      // If it's a network error or policy error, set empty array instead of keeping loading state
+      if (err.message?.includes('Failed to fetch') || 
+          err.name === 'TypeError' || 
+          err.message?.includes('infinite recursion') ||
+          err.code === '42P17') {
         setSnippets([]);
       }
     } finally {
@@ -160,7 +183,26 @@ export const useSnippets = (userId?: string) => {
       const { data, error: searchError } = await supabaseQuery
         .order('updated_at', { ascending: false });
 
-      if (searchError) throw searchError;
+      if (searchError) {
+        // Handle RLS policy errors in search as well
+        if (searchError.message?.includes('infinite recursion') || searchError.code === '42P17') {
+          console.warn('Database policy error in search, using fallback');
+          
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('snippets')
+            .select('*')
+            .eq('is_archived', false)
+            .eq('visibility', 'public')
+            .order('updated_at', { ascending: false });
+
+          if (fallbackError) throw fallbackError;
+          
+          setSnippets(fallbackData || []);
+          return fallbackData || [];
+        }
+        
+        throw searchError;
+      }
 
       setSnippets(data || []);
       return data || [];

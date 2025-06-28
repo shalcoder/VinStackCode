@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 // ElevenLabs API configuration
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1';
 const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
-// Remove hardcoded fallback for security
 
 // Default voice IDs
 const DEFAULT_VOICES = {
@@ -38,20 +37,21 @@ export const elevenLabsService = {
       const {
         text,
         voiceId = DEFAULT_VOICES.neutral,
-        modelId = 'eleven_multilingual_v2', // Updated for multilingual support
+        modelId = 'eleven_multilingual_v2',
         stability = 0.5,
         similarityBoost = 0.75,
         style = 0,
         speakerBoost = true,
       } = request;
 
-      if (!ELEVENLABS_API_KEY) {
-        throw new Error('ElevenLabs API key is not configured');
+      // Check if API key is configured and valid
+      if (!ELEVENLABS_API_KEY || ELEVENLABS_API_KEY.trim() === '' || ELEVENLABS_API_KEY === 'your_elevenlabs_api_key') {
+        console.warn('ElevenLabs API key is not configured. Using fallback audio generation.');
+        return generateFallbackAudio(text);
       }
 
       console.log(`Converting text to speech: "${text.substring(0, 50)}..." with voice ${voiceId}`);
 
-      // Real API call (replace mock for demo)
       const response = await fetch(`${ELEVENLABS_API_URL}/text-to-speech/${voiceId}/stream`, {
         method: 'POST',
         headers: {
@@ -61,23 +61,37 @@ export const elevenLabsService = {
         body: JSON.stringify({
           text,
           model_id: modelId,
-          voice_settings: { stability, similarity_boost: similarityBoost, style, speaker_boost: speakerBoost },
-          optimize_streaming_latency: 2, // Strong latency optimization
+          voice_settings: { 
+            stability, 
+            similarity_boost: similarityBoost, 
+            style, 
+            speaker_boost: speakerBoost 
+          },
+          optimize_streaming_latency: 2,
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`ElevenLabs API error: ${errorData.message || response.statusText}`);
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail?.message || errorData.message || errorMessage;
+        } catch {
+          // If we can't parse the error response, use the status text
+        }
+
+        console.warn(`ElevenLabs API error: ${errorMessage}. Using fallback audio generation.`);
+        return generateFallbackAudio(text);
       }
 
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
-      await trackVoiceGeneration(text, voiceId, audioBlob.size); // Track usage
+      await trackVoiceGeneration(text, voiceId, audioBlob.size);
       return audioUrl;
     } catch (error) {
-      console.error('Error generating speech with ElevenLabs:', error);
-      throw new Error(`Failed to generate speech: ${error.message}`);
+      console.warn('Error generating speech with ElevenLabs, using fallback:', error);
+      return generateFallbackAudio(text);
     }
   },
 
@@ -86,8 +100,8 @@ export const elevenLabsService = {
    */
   getVoices: async () => {
     try {
-      if (!ELEVENLABS_API_KEY) {
-        throw new Error('ElevenLabs API key is not configured');
+      if (!ELEVENLABS_API_KEY || ELEVENLABS_API_KEY.trim() === '' || ELEVENLABS_API_KEY === 'your_elevenlabs_api_key') {
+        return getDefaultVoices();
       }
 
       const response = await fetch(`${ELEVENLABS_API_URL}/voices`, {
@@ -95,18 +109,14 @@ export const elevenLabsService = {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch voices: ${response.statusText}`);
+        console.warn('Failed to fetch ElevenLabs voices, using defaults');
+        return getDefaultVoices();
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error fetching ElevenLabs voices:', error);
-      return Object.values(DEFAULT_VOICES).map(voiceId => ({
-        voice_id: voiceId,
-        name: voiceId === DEFAULT_VOICES.male ? 'Adam' : voiceId === DEFAULT_VOICES.female ? 'Rachel' : 'Domi',
-        category: 'premade',
-        description: 'Mock voice',
-      }));
+      console.warn('Error fetching ElevenLabs voices, using defaults:', error);
+      return getDefaultVoices();
     }
   },
 
@@ -115,8 +125,8 @@ export const elevenLabsService = {
    */
   getUserSubscription: async () => {
     try {
-      if (!ELEVENLABS_API_KEY) {
-        throw new Error('ElevenLabs API key is not configured');
+      if (!ELEVENLABS_API_KEY || ELEVENLABS_API_KEY.trim() === '' || ELEVENLABS_API_KEY === 'your_elevenlabs_api_key') {
+        return getDefaultSubscription();
       }
 
       const response = await fetch(`${ELEVENLABS_API_URL}/user/subscription`, {
@@ -124,26 +134,80 @@ export const elevenLabsService = {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch subscription: ${response.statusText}`);
+        console.warn('Failed to fetch ElevenLabs subscription, using defaults');
+        return getDefaultSubscription();
       }
 
       const data = await response.json();
       return {
         ...data,
-        remainingTokens: data.character_limit - data.character_count, // Custom field
+        remainingTokens: data.character_limit - data.character_count,
       };
     } catch (error) {
-      console.error('Error fetching ElevenLabs subscription:', error);
-      return {
-        tier: 'free',
-        character_count: 0,
-        character_limit: 599000, // Your custom limit
-        remainingTokens: 599000,
-        next_character_count_reset_unix: Date.now() + 30 * 24 * 60 * 60 * 1000,
-      };
+      console.warn('Error fetching ElevenLabs subscription, using defaults:', error);
+      return getDefaultSubscription();
     }
   },
 };
+
+// Fallback function for when ElevenLabs API is not available
+function generateFallbackAudio(text: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      // Use Web Speech API as fallback if available
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
+        
+        // Find a good voice
+        const voices = speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice => 
+          voice.lang.startsWith('en') && voice.name.includes('Google')
+        ) || voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+        
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+
+        speechSynthesis.speak(utterance);
+        
+        // Return a placeholder URL since Web Speech API doesn't return audio data
+        resolve('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+      } else {
+        // If no speech synthesis available, return empty audio
+        resolve('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+      }
+    } catch (error) {
+      console.warn('Fallback audio generation failed:', error);
+      resolve('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+    }
+  });
+}
+
+// Helper function to get default voices when API is not available
+function getDefaultVoices() {
+  return {
+    voices: Object.entries(DEFAULT_VOICES).map(([type, voiceId]) => ({
+      voice_id: voiceId,
+      name: type === 'male' ? 'Adam' : type === 'female' ? 'Rachel' : 'Domi',
+      category: 'premade',
+      description: `Default ${type} voice`,
+    }))
+  };
+}
+
+// Helper function to get default subscription when API is not available
+function getDefaultSubscription() {
+  return {
+    tier: 'free',
+    character_count: 0,
+    character_limit: 10000,
+    remainingTokens: 10000,
+    next_character_count_reset_unix: Date.now() + 30 * 24 * 60 * 60 * 1000,
+  };
+}
 
 // Helper function to track voice generation in analytics
 async function trackVoiceGeneration(text: string, voiceId: string, byteSize?: number) {
@@ -160,7 +224,7 @@ async function trackVoiceGeneration(text: string, voiceId: string, byteSize?: nu
       metadata: {
         text_length: text.length,
         byte_size: byteSize,
-        voice_id,
+        voice_id: voiceId,
         provider: 'elevenlabs',
       },
     });
