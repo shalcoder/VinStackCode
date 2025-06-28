@@ -36,9 +36,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: 'com.codequest.app'
   },
-  web: {
-    favicon: './assets/favicon.png'
-  },
   extra: {
     supabaseUrl: SUPABASE_URL,
     supabaseAnonKey: SUPABASE_ANON_KEY,

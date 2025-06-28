@@ -85,7 +85,7 @@ export default function App() {
     }
   }, [loading, setInitialized]);
 
-  if (!isInitialized || loading || !fontsLoaded) {
+  if (!isInitialized || loading || (!fontsLoaded && !fontError)) {
     return <LoadingScreen />;
   }
 
