@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Plus, Search, Filter, Grid, List } from 'lucide-react-native';
+import { Plus, Search, Filter, Grid2x2 as Grid, List } from 'lucide-react-native';
 import { useAuth } from '../store/authStore';
 import { useSnippets } from '../store/snippetStore';
 import SnippetCardMobile from '../components/snippets/SnippetCardMobile';
