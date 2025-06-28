@@ -1,7 +1,10 @@
 /** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class',
+module.exports = {
+  content: [
+    './App.{js,jsx,ts,tsx}',
+    './src/**/*.{js,jsx,ts,tsx}',
+    './screens/**/*.{js,jsx,ts,tsx}'
+  ],
   theme: {
     extend: {
       colors: {
@@ -44,30 +47,7 @@ export default {
         }
       },
       fontFamily: {
-        mono: ['Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
-      },
-      spacing: {
-        '18': '4.5rem',
-        '88': '22rem',
-      },
-      animation: {
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'slide-in': 'slideIn 0.3s ease-out',
-        'bounce-subtle': 'bounceSubtle 0.6s ease-in-out',
-      },
-      keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideIn: {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(0)' },
-        },
-        bounceSubtle: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-4px)' },
-        },
+        mono: ['SpaceMono'],
       },
     },
   },

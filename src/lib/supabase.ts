@@ -1,18 +1,22 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
 import { Database } from '../types/database';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Get environment variables from Expo constants
+const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || '';
+const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  console.warn('Missing Supabase environment variables. Please check your app.config.ts file.');
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
+    storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,
   },
   realtime: {
     params: {

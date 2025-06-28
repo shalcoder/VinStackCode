@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
+import { Alert } from 'react-native';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -27,6 +28,7 @@ export const useSupabaseAuth = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -82,53 +84,73 @@ export const useSupabaseAuth = () => {
   };
 
   const signUp = async (email: string, password: string, username: string) => {
-    // Only handle the auth signup - let database triggers handle profile/subscription creation
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          full_name: username,
+    try {
+      // Only handle the auth signup - let database triggers handle profile/subscription creation
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            full_name: username,
+          },
         },
-      },
-    });
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // The handle_new_user trigger should automatically create the profile and subscription
-    // We don't need to manually create them here
-    return data;
+      // The handle_new_user trigger should automatically create the profile and subscription
+      return data;
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      throw error;
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Signin error:', error);
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Signout error:', error);
+      Alert.alert('Error signing out', error.message);
+    }
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) throw new Error('No user logged in');
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
 
-    if (error) throw error;
-    setProfile(data);
-    return data;
+      if (error) throw error;
+      setProfile(data);
+      return data;
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      Alert.alert('Error updating profile', error.message);
+      throw error;
+    }
   };
 
   return {
