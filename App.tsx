@@ -10,7 +10,7 @@ import {
   SpaceMono_700Bold
 } from '@expo-google-fonts/space-mono';
 import { View, Text } from 'react-native';
-import { Code2, Gamepad2, User, Settings } from 'lucide-react-native';
+import { Code as Code2, Gamepad2, User, Settings } from 'lucide-react-native';
 
 // Import screens
 import AuthScreen from './src/screens/AuthScreen';
