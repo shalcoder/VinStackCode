@@ -75,8 +75,8 @@ function TabNavigator() {
 export default function App() {
   const { user, loading, isInitialized, setInitialized } = useAuth();
   const [fontsLoaded] = useFonts({
-    'SpaceMono': require('./assets/fonts/SpaceMono-Regular.ttf'),
-    'SpaceMono-Bold': require('./assets/fonts/SpaceMono-Bold.ttf'),
+    'SpaceMono': require('@assets/fonts/SpaceMono-Regular.ttf'),
+    'SpaceMono-Bold': require('@assets/fonts/SpaceMono-Bold.ttf'),
   });
 
   useEffect(() => {
