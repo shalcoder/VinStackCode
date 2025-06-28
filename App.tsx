@@ -5,6 +5,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useFonts } from 'expo-font';
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold
+} from '@expo-google-fonts/space-mono';
 import { View, Text } from 'react-native';
 import { Code2, Gamepad2, User, Settings } from 'lucide-react-native';
 
@@ -75,8 +79,8 @@ function TabNavigator() {
 export default function App() {
   const { user, loading, isInitialized, setInitialized } = useAuth();
   const [fontsLoaded, fontError] = useFonts({
-    'SpaceMono': require('./assets/fonts/SpaceMono-Regular.ttf'),
-    'SpaceMono-Bold': require('./assets/fonts/SpaceMono-Bold.ttf'),
+    'SpaceMono': SpaceMono_400Regular,
+    'SpaceMono-Bold': SpaceMono_700Bold,
   });
 
   useEffect(() => {
